@@ -1,4 +1,4 @@
-package com.artcompanion.ui
+package com.artcompanion.ui.connection
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -25,7 +25,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -39,9 +38,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -51,21 +48,21 @@ import com.artcompanion.hid.ConnectionPrefs
 import com.artcompanion.hid.HidController
 import com.artcompanion.hid.HidState
 import com.artcompanion.hid.KeyChord
-import com.artcompanion.profiles.AppProfile
-import com.artcompanion.profiles.DefaultProfiles
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
 
 /**
- * Phase 2 proof-of-concept screen. Every control sends real HID reports; nothing here
- * pretends to work while disconnected (buttons are disabled until a host is connected).
+ * Connection manager: real Bluetooth state, pairing, reconnection, troubleshooting, and
+ * diagnostics (typing test, free chord, pointer test, event log) for verifying input end to end.
  */
 @Composable
-fun PocScreen(
+fun ConnectionScreen(
     hid: HidController,
     prefs: ConnectionPrefs,
+    autoReconnect: Boolean,
+    onAutoReconnectChange: (Boolean) -> Unit,
     onRequestPermissions: () -> Unit,
     onEnableBluetooth: () -> Unit,
     onMakeDiscoverable: () -> Unit,
@@ -73,30 +70,46 @@ fun PocScreen(
     val state by hid.state.collectAsStateWithLifecycle()
     val log by hid.log.collectAsStateWithLifecycle()
     val connected = state is HidState.Connected
+    var showDiagnostics by rememberSaveable { mutableStateOf(false) }
 
     LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .safeDrawingPadding(),
+        modifier = Modifier.fillMaxSize(),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
+        item { Text("Connection", style = MaterialTheme.typography.headlineSmall) }
+        item { StatusCard(state, hid, prefs, autoReconnect, onAutoReconnectChange, onRequestPermissions, onEnableBluetooth, onMakeDiscoverable) }
+        item { TroubleshootingCard(state) }
         item {
-            Text("ArtCompanion", style = MaterialTheme.typography.headlineSmall)
-            Text(
-                "Connection proof of concept",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Diagnostics", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                Switch(checked = showDiagnostics, onCheckedChange = { showDiagnostics = it })
+            }
         }
-        item { StatusCard(state, hid, prefs, onRequestPermissions, onEnableBluetooth, onMakeDiscoverable) }
-        item { ShortcutTestCard(hid, connected) }
-        item { CustomChordCard(hid, connected) }
-        item { TypeTestCard(hid, connected) }
-        item { PointerPadCard(hid, connected) }
-        item { LogCard(log.map { it.timeMs to it.text }) }
+        if (showDiagnostics) {
+            item { CustomChordCard(hid, connected) }
+            item { TypeTestCard(hid, connected) }
+            item { PointerPadCard(hid, connected) }
+            item { LogCard(log.map { it.timeMs to it.text }) }
+        }
     }
+}
+
+@Composable
+private fun TroubleshootingCard(state: HidState) = Section("Troubleshooting") {
+    val tips = buildList {
+        if (state is HidState.Unsupported) {
+            add("This phone's firmware does not offer the Bluetooth HID Device profile, so it cannot act as a keyboard. " +
+                "Restart Bluetooth and the phone once. If it persists, the profile is disabled by the manufacturer.")
+        }
+        add("Close other \"Bluetooth keyboard/mouse\" apps on the phone. Only one app can be a HID device at a time.")
+        add("iPad doesn't list the phone: wait for \"Ready to pair\", tap Make discoverable, then look under Other Devices in iPad Settings → Bluetooth.")
+        add("Pairing fails or keeps dropping: on the iPad tap ⓘ → Forget This Device, remove the iPad from the phone's Bluetooth settings, then pair again.")
+        add("Shortcut works in Notes but not in the drawing app: tap the canvas once so the app has focus.")
+        add("Brackets or = / − act strangely: set iPad Settings → General → Keyboard → Hardware Keyboard to English (US).")
+        add("To stop acting as a keyboard, use Stop in the ArtCompanion notification.")
+    }
+    tips.forEach { Text("• $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
 }
 
 @Composable
@@ -118,10 +131,12 @@ private fun StatusCard(
     state: HidState,
     hid: HidController,
     prefs: ConnectionPrefs,
+    autoReconnect: Boolean,
+    onAutoReconnectChange: (Boolean) -> Unit,
     onRequestPermissions: () -> Unit,
     onEnableBluetooth: () -> Unit,
     onMakeDiscoverable: () -> Unit,
-) = Section("Connection") {
+) = Section("Status") {
     val (label, detail) = describe(state)
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(
@@ -154,10 +169,14 @@ private fun StatusCard(
         }
     }
 
-    var autoReconnect by remember { mutableStateOf(prefs.autoReconnect) }
+    prefs.lastHostName?.let { last ->
+        if (state !is HidState.Connected) {
+            Text("Last iPad: $last", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text("Auto-reconnect to last iPad", Modifier.weight(1f))
-        Switch(checked = autoReconnect, onCheckedChange = { autoReconnect = it; prefs.autoReconnect = it })
+        Switch(checked = autoReconnect, onCheckedChange = onAutoReconnectChange)
     }
 
     if (state == HidState.Ready || state is HidState.Connected) {
@@ -197,42 +216,6 @@ private fun statusColor(s: HidState) = when (s) {
     is HidState.Connected -> MaterialTheme.colorScheme.primary
     HidState.Ready, is HidState.Connecting, HidState.Registering, HidState.Binding -> MaterialTheme.colorScheme.secondary
     else -> MaterialTheme.colorScheme.error
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun ShortcutTestCard(hid: HidController, connected: Boolean) = Section("Shortcut test") {
-    var profile by rememberSaveable { mutableStateOf(AppProfile.PROCREATE) }
-    val haptic = LocalHapticFeedback.current
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        listOf(AppProfile.PROCREATE, AppProfile.ARTSTUDIO_PRO).forEach { p ->
-            FilterChip(selected = profile == p, onClick = { profile = p }, label = { Text(p.displayName) })
-        }
-    }
-    Text(
-        "Shortcuts are taken from each app's official documentation. Open a canvas on the iPad and tap a button.",
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        DefaultProfiles.forProfile(profile).forEach { def ->
-            val chord = remember(def.chord) { KeyChord.parse(def.chord) }
-            FilledTonalButton(
-                onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    hid.tap(chord)
-                },
-                enabled = connected,
-                modifier = Modifier.heightIn(min = 64.dp).widthIn(min = 96.dp),
-                shape = RoundedCornerShape(14.dp),
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(def.label, textAlign = TextAlign.Center)
-                    Text(chord.display(), fontSize = 11.sp, fontFamily = FontFamily.Monospace)
-                }
-            }
-        }
-    }
 }
 
 @Composable

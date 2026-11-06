@@ -54,7 +54,7 @@ object Usage {
         put("enter", ENTER); put("return", ENTER)
         put("esc", ESCAPE); put("escape", ESCAPE)
         put("backspace", BACKSPACE); put("delete", BACKSPACE); put("⌫", BACKSPACE)
-        put("forwarddelete", DELETE_FORWARD)
+        put("forwarddelete", DELETE_FORWARD); put("⌦", DELETE_FORWARD)
         put("tab", TAB)
         put("space", SPACE); put("spacebar", SPACE)
         put("left", LEFT); put("right", RIGHT); put("up", UP); put("down", DOWN)

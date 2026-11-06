@@ -109,15 +109,21 @@ object Reports {
     )
 
     /**
-     * The report sequence for tapping a chord: modifiers first, then modifiers+keys,
-     * then modifiers alone, then all released. Pressing modifiers in their own report first
-     * mirrors a physical keyboard and avoids hosts that miss a modifier arriving with the key.
+     * The report sequence for tapping [chord] while [held] keys are already down (e.g. a Hold
+     * button). Modifiers go down first, then modifiers+keys, then modifiers alone, then back to
+     * exactly the held state, so a tap never releases keys another finger is holding.
      */
-    fun chordTap(chord: KeyChord): List<ByteArray> = buildList {
-        if (chord.modifiers != 0) add(keyboard(chord.modifiers, emptyList()))
-        add(keyboard(chord.modifiers, chord.keys))
-        if (chord.modifiers != 0) add(keyboard(chord.modifiers, emptyList()))
-        add(keyboardRelease())
+    fun chordTap(chord: KeyChord, held: KeyChord? = null): List<ByteArray> {
+        val baseMods = held?.modifiers ?: 0
+        val baseKeys = held?.keys.orEmpty()
+        val mods = baseMods or chord.modifiers
+        val keys = (baseKeys + chord.keys).distinct().take(6)
+        return buildList {
+            if (mods != baseMods) add(keyboard(mods, baseKeys))
+            add(keyboard(mods, keys))
+            if (mods != baseMods) add(keyboard(mods, baseKeys))
+            add(keyboard(baseMods, baseKeys))
+        }
     }
 
     /** Splits a large relative movement into int8-sized steps. */

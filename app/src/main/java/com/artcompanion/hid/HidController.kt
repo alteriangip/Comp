@@ -158,25 +158,46 @@ class HidController(context: Context, private val prefs: ConnectionPrefs) {
 
     val isConnected: Boolean get() = _state.value is HidState.Connected
 
+    /** Keys currently held by press(); taps are layered on top of these. Only touched on the io thread. */
+    private var held: KeyChord? = null
+
     /** Taps a shortcut (press then release). Returns false if no host is connected. */
     fun tap(chord: KeyChord): Boolean {
         if (!isConnected) return false
-        io.execute { Reports.chordTap(chord).forEach { sendKeyboard(it) } }
+        io.execute { Reports.chordTap(chord, held).forEach { sendKeyboard(it) } }
         return true
     }
 
-    /** Holds keys down until [releaseAll], e.g. holding Space or a modifier. */
+    /** Holds keys down until [release] / [releaseAll], e.g. holding Space or a modifier. */
     fun press(chord: KeyChord): Boolean {
         if (!isConnected) return false
         io.execute {
-            if (chord.modifiers != 0) sendKeyboard(Reports.keyboard(chord.modifiers, emptyList()))
-            sendKeyboard(Reports.keyboard(chord.modifiers, chord.keys))
+            val base = held
+            val mods = (base?.modifiers ?: 0) or chord.modifiers
+            val keys = (base?.keys.orEmpty() + chord.keys).distinct().take(6)
+            if (mods != (base?.modifiers ?: 0)) sendKeyboard(Reports.keyboard(mods, base?.keys.orEmpty()))
+            sendKeyboard(Reports.keyboard(mods, keys))
+            held = KeyChord(mods, keys)
         }
         return true
     }
 
+    /** Releases the keys of one held chord, keeping any other held keys down. */
+    fun release(chord: KeyChord) {
+        io.execute {
+            val base = held ?: return@execute
+            val keys = base.keys - chord.keys.toSet()
+            val mods = base.modifiers and chord.modifiers.inv()
+            held = if (keys.isEmpty() && mods == 0) null else KeyChord(mods, keys)
+            if (isConnected) sendKeyboard(Reports.keyboard(mods, keys))
+        }
+    }
+
     fun releaseAll() {
-        io.execute { if (isConnected) sendKeyboard(Reports.keyboardRelease()) }
+        io.execute {
+            held = null
+            if (isConnected) sendKeyboard(Reports.keyboardRelease())
+        }
     }
 
     /** Types text as individual key taps (US layout; set the iPad's hardware keyboard to US/English). */
@@ -290,7 +311,7 @@ class HidController(context: Context, private val prefs: ConnectionPrefs) {
                 BluetoothProfile.STATE_DISCONNECTING -> log("Disconnecting from ${info.name}")
                 BluetoothProfile.STATE_DISCONNECTED -> {
                     val wasHost = host?.address == device.address
-                    if (wasHost) host = null
+                    if (wasHost) { host = null; held = null }
                     log("Disconnected from ${info.name}")
                     set(if (registered) HidState.Ready else HidState.Registering)
                     if (wasHost) scheduleReconnect(device.address)

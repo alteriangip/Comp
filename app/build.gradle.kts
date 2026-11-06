@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -13,8 +14,8 @@ android {
         // BluetoothHidDevice (phone acting as a keyboard/mouse) was added in API 28.
         minSdk = 28
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0-poc"
+        versionCode = 2
+        versionName = "0.2.0"
     }
 
     buildTypes {
@@ -30,6 +31,15 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
     buildFeatures { compose = true }
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+        unitTests.all { test ->
+            // Optional: -ProbolectricRepoUrl=<maven mirror> if Maven Central is unreachable/rate-limited.
+            providers.gradleProperty("robolectricRepoUrl").orNull?.let {
+                test.systemProperty("robolectric.dependency.repo.url", it)
+            }
+        }
+    }
 }
 
 dependencies {
@@ -40,7 +50,13 @@ dependencies {
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
     implementation(libs.compose.material3)
+    implementation(libs.compose.icons.extended)
+    implementation(libs.kotlinx.serialization.json)
     implementation(libs.compose.ui.tooling.preview)
     debugImplementation(libs.compose.ui.tooling)
     testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
+    testImplementation(platform(libs.compose.bom))
+    testImplementation(libs.compose.ui.test.junit4)
+    debugImplementation(libs.compose.ui.test.manifest)
 }

@@ -23,6 +23,23 @@ class ReportsTest {
         assertArrayEquals(bytes(0, 0, 0x05, 0, 0, 0, 0, 0), seq[0])
     }
 
+    @Test fun tapWhileHoldingKeepsHeldKeysDown() {
+        // Holding ⌥ (Procreate Modify) and tapping B must end with ⌥ still pressed.
+        val held = KeyChord.parse("Alt")
+        val seq = Reports.chordTap(KeyChord.parse("B"), held)
+        assertArrayEquals(bytes(0x04, 0, 0x05, 0, 0, 0, 0, 0), seq.first())
+        assertArrayEquals(bytes(0x04, 0, 0, 0, 0, 0, 0, 0), seq.last())
+        seq.forEach { assertEquals(0x04, it[0].toInt() and 0x04) }
+    }
+
+    @Test fun tapWithExtraModifierWhileHoldingSpace() {
+        val held = KeyChord.parse("Space")
+        val seq = Reports.chordTap(KeyChord.parse("Cmd+Z"), held)
+        assertArrayEquals(bytes(0x08, 0, Usage.SPACE, 0, 0, 0, 0, 0), seq[0])
+        assertArrayEquals(bytes(0x08, 0, Usage.SPACE, 0x1D, 0, 0, 0, 0), seq[1])
+        assertArrayEquals(bytes(0, 0, Usage.SPACE, 0, 0, 0, 0, 0), seq.last())
+    }
+
     @Test fun mouseClampsAxes() {
         assertArrayEquals(bytes(1, 127, -127, 0, 0), Reports.mouse(1, 500, -500))
     }

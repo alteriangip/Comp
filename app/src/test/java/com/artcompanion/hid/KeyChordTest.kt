@@ -1,8 +1,5 @@
 package com.artcompanion.hid
 
-import com.artcompanion.profiles.AppProfile
-import com.artcompanion.profiles.DefaultProfiles
-import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -52,15 +49,17 @@ class KeyChordTest {
         KeyChord.parse("Cmd+Banana")
     }
 
-    @Test fun everyDefaultShortcutParses() {
-        AppProfile.entries.forEach { p ->
-            DefaultProfiles.forProfile(p).forEach { KeyChord.parse(it.chord) }
+    @Test fun singleKeySerializationIsParseable() {
+        // The button editor shows KeyChord(0, keys).serialize() in its key field.
+        listOf("Space", "Enter", "Esc", "Tab", "Backspace", "ForwardDelete", "Left", "F5", "[", "=", ",", "Z", "0").forEach {
+            val c = KeyChord.parse(it)
+            assertEquals(it, c, KeyChord.parse(KeyChord(0, c.keys).serialize()))
         }
     }
 
-    @Test fun profilesAreIndependentLists() {
-        assertTrue(DefaultProfiles.procreate !== DefaultProfiles.artstudioPro)
-        assertEquals(DefaultProfiles.procreate.map { it.id }.size, DefaultProfiles.procreate.map { it.id }.toSet().size)
-        assertEquals(DefaultProfiles.artstudioPro.map { it.id }.size, DefaultProfiles.artstudioPro.map { it.id }.toSet().size)
+    @Test fun modifierOnlyChord() {
+        val c = KeyChord.parse("Alt")
+        assertEquals(Mod.ALT, c.modifiers)
+        assertTrue(c.keys.isEmpty())
     }
 }

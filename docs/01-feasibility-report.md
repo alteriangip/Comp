@@ -1,11 +1,14 @@
 # ArtCompanion: Phase 1 Technical Feasibility Report
 
-Status: Phase 1 complete. The Phase 2 proof of concept is built but **not yet tested on real hardware**.
+Status: Phase 1 complete. Phase 2 proof of concept **tested by the user on Galaxy A15 + iPad: "It works"**
+(2026-11-06). That confirms the core route: the A15 exposes the HID Device profile, the iPad pairs, and
+shortcuts reach the iPad. Results for the individual exploratory items (§6, tests 9–11, 15, 16 and 21 in the
+test plan) have not been reported yet, so the 🧪 rows below remain hypotheses.
 Last updated: 2026-11-06
 
 How to read this report:
 - **Verified (documentation)**: confirmed from official vendor documentation (sources at the end).
-- **Verified (device)**: confirmed on a real Galaxy A15 + iPad. Nothing has this status yet. It requires the Phase 2 hardware test in `docs/02-poc-test-plan.md`.
+- **Verified (device)**: confirmed on a real Galaxy A15 + iPad. So far: HID registration, pairing, and keyboard shortcuts (user report, Phase 2).
 - **Hypothesis**: technically plausible but unverified. It must not ship as "working" until it passes a device test.
 
 ---
@@ -211,9 +214,9 @@ Key decisions:
 
 ## 6. Risks and open questions (resolved by Phase 2 device tests)
 
-1. Does the Galaxy A15 LTE expose `HID_DEVICE`? (PoC status card shows this immediately.)
-2. Does the iPad list and pair the phone as a keyboard/mouse, and does it keep the connection when the phone screen turns off?
-3. Do ⌘Z / ⇧⌘Z / B / `]` work inside Procreate and Artstudio Pro (not just Notes)?
+1. ~~Does the Galaxy A15 LTE expose `HID_DEVICE`?~~ **Yes** (user test).
+2. ~~Does the iPad pair with the phone as a keyboard/mouse?~~ **Yes** (user test). Still open: does it stay connected with the phone screen off?
+3. ~~Do the shortcuts work on the iPad?~~ **Yes** per user test. Still open: which specific shortcuts were checked in each app.
 4. Procreate: does the scroll wheel zoom or scroll the canvas? Does a pointer drag paint?
 5. Artstudio Pro: does H + pointer drag pan? Does Space-hold + drag pan?
 6. Do the HEX fields accept typed input from a hardware keyboard?

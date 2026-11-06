@@ -7,8 +7,26 @@ ArtCompanion turns an Android phone into a wireless companion controller for iPa
 `BluetoothHidDevice` API. The iPad pairs with it in *Settings → Bluetooth*, exactly like a physical keyboard.
 Buttons on the phone send the drawing app's own documented keyboard shortcuts.
 
-> **Current status: Phase 2 (connection proof of concept).** The APK builds and the unit tests pass,
-> but it has **not yet been tested on a real Galaxy A15 + iPad**. Run `docs/02-poc-test-plan.md` first.
+> **Current status: Phase 3 (core app).** You confirmed the Phase 2 connection works on the Galaxy A15 + iPad.
+> Phase 3 adds the main interface, editable shortcut deck, independent profiles and saved settings.
+> Canvas navigation, colour studio, reference viewer, brush controls and the radial menu come in Phase 4.
+
+## Features (Phase 3)
+* **Shortcut deck**: multiple pages per profile, large buttons in a grid that adapts to portrait and landscape.
+  Each button sends a real keyboard shortcut on touch-down. Every button is editable: label, icon (52 choices),
+  shortcut (⌘ ⇧ ⌥ ⌃ + any key), size (1–3 columns, double height), order, and behaviour:
+  * **Tap**: press and release once.
+  * **Hold**: keys stay down while your finger is on the button (e.g. Procreate's Modify ⌥).
+    Other buttons tapped meanwhile are layered on top, so the held key stays down.
+  * **Repeat**: auto-repeats while held (undo, brush size, zoom).
+* **Profiles**: Procreate, Artstudio Pro and Custom, with defaults taken only from each app's official
+  shortcut list. Each profile is a separate file, so editing one never changes another. You can duplicate a
+  profile to make your own, rename or delete user profiles, and reset any profile to its defaults.
+  The last used profile is remembered.
+* **Connection**: live state, pairing helper, paired-device list, connect/disconnect, auto-reconnect,
+  troubleshooting tips, and diagnostics (free shortcut sender, typing test, pointer test, event log).
+* **Settings**: dark/light/system theme, haptics, button size, columns, shortcut hints, keep screen on,
+  auto-reconnect, backup/restore of all profiles + settings to a JSON file, and reset to defaults.
 
 ## Documents
 | | |
@@ -16,7 +34,7 @@ Buttons on the phone send the drawing app's own documented keyboard shortcuts.
 | [`docs/01-feasibility-report.md`](docs/01-feasibility-report.md) | Connection methods evaluated, architecture, and the full **feature compatibility matrix** for Procreate and Artstudio Pro |
 | [`docs/02-poc-test-plan.md`](docs/02-poc-test-plan.md) | Step-by-step hardware tests for the PoC, with a results column |
 
-## What the PoC does (all real, nothing simulated)
+## Connection layer (from the Phase 2 PoC; all real, nothing simulated)
 * Registers as a composite HID keyboard + mouse. It detects and reports ROMs that don't support this.
 * Pairing helper ("Make discoverable"), a list of paired devices with Connect, Disconnect.
 * Auto-reconnect to the last iPad, with back-off. A foreground service keeps the link alive in the background.
@@ -39,9 +57,13 @@ or the command line:
 # Tell Gradle where the SDK is (Android Studio does this automatically)
 echo "sdk.dir=$HOME/Android/Sdk" > local.properties
 
-./gradlew testDebugUnitTest      # unit tests (chord parser, HID reports, descriptor)
+./gradlew testDebugUnitTest      # unit + UI tests (chord parser, HID reports, profiles, backup,
+                                 # and Robolectric-rendered screens; screenshots in app/build/ui-screens/)
 ./gradlew assembleDebug          # → app/build/outputs/apk/debug/app-debug.apk
 ```
+
+If Maven Central is unreachable for Robolectric's runtime jar, add
+`-ProbolectricRepoUrl=<maven mirror URL>` to the test command.
 
 ### Release APK
 ```bash
@@ -83,13 +105,21 @@ No internet permission is requested.
 ## Project layout
 ```
 app/src/main/java/com/artcompanion/
-  hid/        HidController, HidDescriptor + Reports, KeyChord parser, HID key codes, permissions, prefs
-  profiles/   Default (documented) shortcut sets for Procreate / Artstudio Pro / Custom
+  hid/        HidController (Bluetooth HID Device), descriptor + report builder, KeyChord parser, key codes
+  input/      CommandDispatcher: the single path from UI actions to HID input
+  data/       Models, documented default profiles, ProfileRepository (one JSON file per profile,
+              atomic writes), SettingsRepository, backup codec
   service/    Foreground service holding the HID registration
-  ui/         Compose theme and the PoC screen
+  ui/         App shell (bottom bar / rail), theme, icons, haptics
+    deck/       Shortcut deck + button editor
+    connection/ Connection manager + diagnostics
+    settings/   Settings, profile management, backup/restore
 ```
 
+Data lives in the app's private storage (`files/profiles/*.json`, plus SharedPreferences for settings).
+Uninstalling the app deletes it, so export a backup first.
+
 ## Roadmap
-Phase 3: main UI, editable shortcut deck and profiles (JSON-persisted), settings. Phase 4: navigation pad,
-colour studio, reference viewer, brush controls, radial menu. Phase 5: device testing and optimisation.
-Phase 6: release. Phase 3 starts once the Phase 2 hardware results are in.
+* Phase 4: navigation pad, colour studio (+ palette import/export), reference viewer, brush controls, radial menu.
+* Phase 5: device testing and optimisation.
+* Phase 6: release.

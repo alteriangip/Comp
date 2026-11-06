@@ -7,14 +7,15 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import com.artcompanion.hid.HidPermissions
 import com.artcompanion.service.HidForegroundService
-import com.artcompanion.ui.ArtCompanionTheme
-import com.artcompanion.ui.PocScreen
+import com.artcompanion.ui.AppRoot
+import com.artcompanion.ui.AppViewModel
 
 class MainActivity : ComponentActivity() {
 
-    private val app get() = application as ArtCompanionApp
+    private val vm: AppViewModel by viewModels()
 
     private val permissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { startHid() }
@@ -29,26 +30,31 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            ArtCompanionTheme {
-                PocScreen(
-                    hid = app.hid,
-                    prefs = app.prefs,
-                    onRequestPermissions = { permissionLauncher.launch(HidPermissions.runtime) },
-                    onEnableBluetooth = { enableBtLauncher.launch(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)) },
-                    onMakeDiscoverable = {
-                        discoverableLauncher.launch(
-                            Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE)
-                                .putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 120)
-                        )
-                    },
-                )
-            }
+            AppRoot(
+                vm = vm,
+                onRequestPermissions = { permissionLauncher.launch(HidPermissions.runtime) },
+                onEnableBluetooth = { enableBtLauncher.launch(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)) },
+                onMakeDiscoverable = {
+                    discoverableLauncher.launch(
+                        Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE)
+                            .putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 120)
+                    )
+                },
+            )
         }
-        if (HidPermissions.hasConnect(this)) startHid() else permissionLauncher.launch(HidPermissions.runtime)
+        if (savedInstanceState == null) {
+            if (HidPermissions.hasConnect(this)) startHid() else permissionLauncher.launch(HidPermissions.runtime)
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Covers returning from system Settings after granting permission / enabling Bluetooth.
+        if (HidPermissions.hasConnect(this)) startHid()
     }
 
     private fun startHid() {
         if (HidPermissions.hasConnect(this)) HidForegroundService.start(this)
-        app.hid.refresh()
+        (application as ArtCompanionApp).hid.refresh()
     }
 }
