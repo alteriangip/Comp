@@ -1,0 +1,7 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <!-- Brush nib over a rounded control pad -->
+    <path android:fillColor="#E8B86D" android:pathData="M36,40h36a8,8 0,0 1,8 8v20a8,8 0,0 1,-8 8h-36a8,8 0,0 1,-8 -8v-20a8,8 0,0 1,8 -8z"/>
+    <path android:fillColor="#0F0F11" android:pathData="M40,48h8v8h-8zM52,48h8v8h-8zM64,48h8v8h-8zM40,60h32v6h-32z"/>
+    <path android:fillColor="#E6E4E0" android:pathData="M70,22l10,10l-14,14l-6,1l1,-6z"/>
+</vector>

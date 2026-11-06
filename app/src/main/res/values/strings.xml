@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">ArtCompanion</string>
+    <string name="channel_name">Controller connection</string>
+    <string name="notif_title">ArtCompanion is active</string>
+    <string name="notif_text">Acting as a Bluetooth keyboard and mouse for your iPad</string>
+    <string name="notif_stop">Stop</string>
+</resources>
